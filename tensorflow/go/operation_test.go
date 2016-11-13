@@ -15,6 +15,7 @@
 package tensorflow
 
 import (
+	"fmt"
 	"runtime"
 	"runtime/debug"
 	"testing"
@@ -47,6 +48,92 @@ func TestOperationLifetime(t *testing.T) {
 	}
 	if got, want := op.Type(), "Placeholder"; got != want {
 		t.Errorf("Got '%s', want '%s'", got, want)
+	}
+}
+
+func TestOperationOutputListSize(t *testing.T) {
+	graph := NewGraph()
+	c1, err := Const(graph, "c1", int64(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2, err := Const(graph, "c2", [][]int64{{1, 2}, {3, 4}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The ShapeN op takes a list of tensors as input and a list as output.
+	op, err := graph.AddOperation(OpSpec{
+		Type:  "ShapeN",
+		Input: []Input{OutputList{c1, c2}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := op.OutputListSize("output")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := n, 2; got != want {
+		t.Errorf("Got %d, want %d", got, want)
+	}
+	if got, want := op.NumOutputs(), 2; got != want {
+		t.Errorf("Got %d, want %d", got, want)
+	}
+}
+
+func TestOutputShape(t *testing.T) {
+	graph := NewGraph()
+	testdata := []struct {
+		Value interface{}
+		Shape []int64
+	}{
+		{ // Scalar
+			int64(0),
+			[]int64{},
+		},
+		{ // Vector
+			[]int64{1, 2, 3},
+			[]int64{3},
+		},
+		{ // Matrix
+			[][]float64{
+				{1, 2, 3},
+				{4, 5, 6},
+			},
+			[]int64{2, 3},
+		},
+	}
+	for idx, test := range testdata {
+		t.Run(fmt.Sprintf("#%d Value %T", idx, test.Value), func(t *testing.T) {
+			c, err := Const(graph, fmt.Sprintf("const%d", idx), test.Value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			shape, err := c.Shape()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := len(shape), len(test.Shape); got != want {
+				t.Fatalf("Got a shape with %d dimensions, want %d", got, want)
+			}
+			for i := 0; i < len(shape); i++ {
+				if got, want := shape[i], test.Shape[i]; got != want {
+					t.Errorf("Got %d, want %d for dimension #%d/%d", got, want, i, len(shape))
+				}
+			}
+		})
+	}
+	// Unknown number of dimensions
+	dummyTensor, err := NewTensor(float64(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	placeholder, err := Placeholder(graph, "placeholder", dummyTensor.DataType())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shape, err := placeholder.Shape(); err == nil {
+		t.Errorf("Got shape %v, wanted error", shape)
 	}
 }
 

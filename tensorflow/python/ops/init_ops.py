@@ -66,9 +66,12 @@ def zeros_initializer(shape, dtype=dtypes.float32, partition_info=None):
   return array_ops.zeros(shape, dtype)
 
 
-def ones_initializer(shape, dtype=dtypes.float32, partition_info=None):
+def ones_initializer(dtype=dtypes.float32, partition_info=None):
   """An adaptor for ones() to match the Initializer spec."""
-  return array_ops.ones(shape, dtype)
+  def _initializer(shape, dtype=dtype, partition_info=None):
+    return constant_op.constant(1, dtype=dtype, shape=shape)
+
+  return _initializer
 
 
 def constant_initializer(value=0, dtype=dtypes.float32):
@@ -139,7 +142,7 @@ def constant_initializer(value=0, dtype=dtypes.float32):
     >>>   x = tf.get_variable('x', shape=[2, 3], initializer=init)
 
     ValueError: Too many elements provided. Needed at most 6, but received 8
-    ```
+  ```
   """
   def _initializer(shape, dtype=dtype, partition_info=None):
     return constant_op.constant(value, dtype=dtype, shape=shape)

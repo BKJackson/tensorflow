@@ -36,6 +36,13 @@ you understand the dataflow graph and debug it.
 [View Tutorial](graph_viz/index.md)
 
 
+## TensorBoard: Embedding Visualization
+
+This tutorial describes how to use the embedding projector in TensorBoard to
+visualize your embeddings.
+
+[View Tutorial](embedding_viz/index.md)
+
 ## Reading Data
 
 This tutorial describes the three main methods of getting data into your
@@ -149,3 +156,10 @@ This tutorial shows how to read and write HDFS files, and will later describe
 running on cluster managers.
 
 [View Tutorial](../how_tos/hadoop/index.md)
+
+## TensorFlow in other languages
+
+This guide describes how TensorFlow features can be provided in other
+programming languages.
+
+[View Tutorial](language_bindings/index.md)

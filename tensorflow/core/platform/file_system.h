@@ -26,8 +26,13 @@ limitations under the License.
 #include "tensorflow/core/lib/core/stringpiece.h"
 #include "tensorflow/core/platform/file_statistics.h"
 #include "tensorflow/core/platform/macros.h"
+#include "tensorflow/core/platform/platform.h"
 #include "tensorflow/core/platform/protobuf.h"
 #include "tensorflow/core/platform/types.h"
+
+#ifdef PLATFORM_WINDOWS
+#undef DeleteFile
+#endif
 
 namespace tensorflow {
 
@@ -56,7 +61,7 @@ class FileSystem {
   virtual Status NewReadOnlyMemoryRegionFromFile(
       const string& fname, std::unique_ptr<ReadOnlyMemoryRegion>* result) = 0;
 
-  virtual bool FileExists(const string& fname) = 0;
+  virtual Status FileExists(const string& fname) = 0;
 
   /// \brief Returns the immediate children in the given directory.
   ///
@@ -97,10 +102,33 @@ class FileSystem {
 
   virtual Status CreateDir(const string& dirname) = 0;
 
+  // \brief Creates the specified directory and all the necessary
+  // subdirectories. Typical return codes.
+  //  * OK - successfully created the directory and sub directories, even if
+  //         they were already created.
+  //  * PERMISSION_DENIED - dirname or some subdirectory is not writable.
+  virtual Status RecursivelyCreateDir(const string& dirname);
+
   virtual Status DeleteDir(const string& dirname) = 0;
+
+  // \brief Deletes the specified directory and all subdirectories and files
+  // underneath it. undeleted_files and undeleted_dirs stores the number of
+  // files and directories that weren't deleted (unspecified if the return
+  // status is not OK).
+  // REQUIRES: undeleted_files, undeleted_dirs to be not null.
+  // Typical return codes
+  //  * OK - dirname exists and we were able to delete everything underneath.
+  //  * NOT_FOUND - dirname doesn't exist
+  //  * PERMISSION_DENIED - dirname or some descendant is not writable
+  //  * UNIMPLEMENTED - Some underlying functions (like Delete) are not
+  //                    implemented
+  virtual Status DeleteRecursively(const string& dirname,
+                                   int64* undeleted_files,
+                                   int64* undeleted_dirs);
 
   virtual Status GetFileSize(const string& fname, uint64* file_size) = 0;
 
+  // Overwrites the target if it exists.
   virtual Status RenameFile(const string& src, const string& target) = 0;
 
   // Translate an URI to a filename usable by the FileSystem implementation. The
@@ -117,6 +145,8 @@ class FileSystem {
   //  * UNIMPLEMENTED - The file factory doesn't support directories.
   virtual Status IsDirectory(const string& fname);
 };
+
+// START_SKIP_DOXYGEN
 
 #ifndef SWIG
 // Degenerate file system that provides no implementations.
@@ -148,7 +178,9 @@ class NullFileSystem : public FileSystem {
         "NewReadOnlyMemoryRegionFromFile unimplemented");
   }
 
-  bool FileExists(const string& fname) override { return false; }
+  Status FileExists(const string& fname) override {
+    return errors::Unimplemented("FileExists unimplemented");
+  }
 
   Status GetChildren(const string& dir, std::vector<string>* result) override {
     return errors::Unimplemented("GetChildren unimplemented");
@@ -179,6 +211,8 @@ class NullFileSystem : public FileSystem {
   }
 };
 #endif
+
+// END_SKIP_DOXYGEN
 
 /// A file abstraction for randomly reading the contents of a file.
 class RandomAccessFile {
@@ -254,19 +288,6 @@ class FileSystemRegistry {
   virtual Status GetRegisteredFileSystemSchemes(
       std::vector<string>* schemes) = 0;
 };
-
-// Populates the scheme, host, and path from a URI.
-//
-// Corner cases:
-// - If the URI is invalid, scheme and host are set to empty strings and the
-//   passed string is assumed to be a path
-// - If the URI omits the path (e.g. file://host), then the path is left empty.
-void ParseURI(StringPiece uri, StringPiece* scheme, StringPiece* host,
-              StringPiece* path);
-
-// Creates a URI from a scheme, host, and path. If the scheme is empty, we just
-// return the path.
-string CreateURI(StringPiece scheme, StringPiece host, StringPiece path);
 
 }  // namespace tensorflow
 

@@ -15,21 +15,40 @@
 package tensorflow
 
 func Placeholder(g *Graph, name string, dt DataType) (Output, error) {
-	b := newOpBuilder(g, "Placeholder", name)
-	b.SetAttrType("dtype", dt)
-	op, err := b.Build()
-	if err != nil {
-		return Output{}, err
+	op, err := g.AddOperation(OpSpec{
+		Type: "Placeholder",
+		Name: name,
+		Attrs: map[string]interface{}{
+			"dtype": dt,
+		},
+	})
+	return op.Output(0), err
+}
+
+func Const(g *Graph, name string, value interface{}) (Output, error) {
+	t, ok := value.(*Tensor)
+	if !ok {
+		var err error
+		if t, err = NewTensor(value); err != nil {
+			return Output{}, err
+		}
 	}
-	return Output{op, 0}, nil
+	op, err := g.AddOperation(OpSpec{
+		Type: "Const",
+		Name: name,
+		Attrs: map[string]interface{}{
+			"dtype": t.DataType(),
+			"value": t,
+		},
+	})
+	return op.Output(0), err
 }
 
 func Neg(g *Graph, name string, port Output) (Output, error) {
-	b := newOpBuilder(g, "Neg", name)
-	b.AddInput(port)
-	op, err := b.Build()
-	if err != nil {
-		return Output{}, err
-	}
-	return Output{op, 0}, nil
+	op, err := g.AddOperation(OpSpec{
+		Type: "Neg",
+		Name: name,
+		Input: []Input{port},
+	})
+	return op.Output(0), err
 }
